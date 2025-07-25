@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learn Qur'an - Surah An-Nas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+            position: relative;
+        }
+
+        .back-button {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-50%) translateX(-2px);
+        }
+
+        .surah-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .surah-info {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .audio-controls {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        .control-row {
+            margin-bottom: 15px;
+        }
+
+        .repeat-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .repeat-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .repeat-option input[type="radio"] {
+            accent-color: #667eea;
+        }
+
+        .repeat-count-container {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .repeat-count-container label {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .repeat-count-container select {
+            border: none;
+            background: transparent;
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: pointer;
+        }
+
+        .control-button {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 12px 25px;
+            margin: 0 8px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .control-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .verse-status {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-top: 15px;
+            font-weight: 500;
+        }
+
+        .verse-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            min-height: 400px;
+        }
+
+        .verse-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateX(100px);
+            text-align: center;
+            width: 90%;
+            max-width: 800px;
+            opacity: 0;
+            transition: all 0.5s ease;
+        }
+
+        .verse-display.active {
+            opacity: 1;
+            transform: translate(-50%, -50%) translateX(0);
+        }
+
+        .verse-display.exit-left {
+            opacity: 0;
+            transform: translate(-50%, -50%) translateX(-100px);
+        }
+
+        .verse-display.exit-right {
+            opacity: 0;
+            transform: translate(-50%, -50%) translateX(100px);
+        }
+
+        .bismillah {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 15px;
+            color: white;
+            margin: 0 auto;
+            max-width: 700px;
+        }
+
+        .bismillah-arabic {
+            font-size: 2.8rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            direction: rtl;
+            line-height: 1.4;
+        }
+
+        .bismillah-english {
+            font-size: 1.3rem;
+            opacity: 0.95;
+            line-height: 1.4;
+        }
+
+        .verse-number {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 50px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .arabic-text {
+            font-size: 3.5rem;
+            line-height: 1.6;
+            text-align: center;
+            direction: rtl;
+            margin-bottom: 30px;
+            color: #2c3e50;
+            font-weight: 500;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            word-spacing: 0.2em;
+        }
+
+        .english-text {
+            font-size: 1.6rem;
+            line-height: 1.5;
+            color: #34495e;
+            font-style: italic;
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 10px;
+            background: rgba(52, 152, 219, 0.1);
+            border-left: 4px solid #3498db;
+        }
+
+        .navigation-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 25px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            gap: 20px;
+        }
+
+        .nav-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .nav-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .verse-counter {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .current-verse-highlight {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transform: scale(1.02);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+                min-height: 90vh;
+            }
+            
+            .back-button {
+                position: static;
+                transform: none;
+                margin-bottom: 15px;
+                align-self: flex-start;
+                font-size: 0.9rem;
+                padding: 8px 16px;
+            }
+            
+            .header {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .verse-container {
+                padding: 15px;
+                min-height: 350px;
+            }
+            
+            .verse-display {
+                width: 95%;
+            }
+            
+            .surah-title {
+                font-size: 2rem;
+            }
+            
+            .arabic-text {
+                font-size: 2.5rem;
+                line-height: 1.5;
+                word-spacing: 0.1em;
+            }
+            
+            .english-text {
+                font-size: 1.3rem;
+                padding: 15px;
+            }
+            
+            .bismillah-arabic {
+                font-size: 2.2rem;
+            }
+            
+            .bismillah-english {
+                font-size: 1.1rem;
+            }
+            
+            .control-button, .nav-button {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+
+            .verse-counter {
+                font-size: 0.9rem;
+            }
+
+            .repeat-controls {
+                gap: 10px;
+            }
+
+            .repeat-option {
+                font-size: 0.8rem;
+                padding: 6px 12px;
+            }
+
+            .repeat-count-container {
+                font-size: 0.8rem;
+                padding: 6px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-button">
+                ←️ Back to Home
+            </a>
+            <h1 class="surah-title">سُورَةُ النَّاس</h1>
+            <div class="surah-info">Surah An-Nas (The Mankind) • Chapter 114 • 6 Verses</div>
+        </div>
+
+        <div class="audio-controls">
+            <div class="control-row">
+                <button class="control-button" onclick="startRecitation()">▶️ Start Recitation</button>
+                <button class="control-button" onclick="stopRecitation()">⏹️ Stop</button>
+                <button class="control-button" onclick="pauseRecitation()">⏸️ Pause</button>
+            </div>
+            
+            <div class="repeat-controls">
+                <div class="repeat-option">
+                    <input type="radio" id="no-repeat" name="repeatMode" value="none" checked onchange="changeRepeatMode()">
+                    <label for="no-repeat">No Repeat</label>
+                </div>
+                
+                <div class="repeat-option">
+                    <input type="radio" id="repeat-verse" name="repeatMode" value="verse" onchange="changeRepeatMode()">
+                    <label for="repeat-verse">🔁 Repeat Current Verse</label>
+                </div>
+                
+                <div class="repeat-option">
+                    <input type="radio" id="repeat-surah" name="repeatMode" value="surah" onchange="changeRepeatMode()">
+                    <label for="repeat-surah">🔄 Repeat Entire Surah</label>
+                </div>
+                
+                <div class="repeat-count-container">
+                    <label for="repeat-count">Times:</label>
+                    <select id="repeat-count" onchange="changeRepeatCount()">
+                        <option value="2">2</option>
+                        <option value="3" selected>3</option>
+                        <option value="5">5</option>
+                        <option value="7">7</option>
+                        <option value="10">10</option>
+                        <option value="infinite">∞</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="verse-status" id="status">Ready to recite with Mishary Alafasy</div>
+        </div>
+
+        <div class="verse-container">
+            <!-- Bismillah -->
+            <div class="verse-display active" id="bismillah-display">
+                <div class="bismillah">
+                    <div class="bismillah-arabic">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+                    <div class="bismillah-english">In the name of Allah, the Most Gracious, the Most Merciful</div>
+                </div>
+            </div>
+
+            <!-- Verses 1-6 -->
+            <div class="verse-display" id="verse-1-display">
+                <div class="verse-number">1</div>
+                <div class="arabic-text">قُلْ أَعُوذُ بِرَبِّ النَّاسِ</div>
+                <div class="english-text">Say: "I seek refuge with the Lord of mankind,"</div>
+            </div>
+
+            <div class="verse-display" id="verse-2-display">
+                <div class="verse-number">2</div>
+                <div class="arabic-text">مَلِكِ النَّاسِ</div>
+                <div class="english-text">"The King of mankind,"</div>
+            </div>
+
+            <div class="verse-display" id="verse-3-display">
+                <div class="verse-number">3</div>
+                <div class="arabic-text">إِلَٰهِ النَّاسِ</div>
+                <div class="english-text">"The God of mankind,"</div>
+            </div>
+
+            <div class="verse-display" id="verse-4-display">
+                <div class="verse-number">4</div>
+                <div class="arabic-text">مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ</div>
+                <div class="english-text">"From the evil of the whisperer who withdraws,"</div>
+            </div>
+
+            <div class="verse-display" id="verse-5-display">
+                <div class="verse-number">5</div>
+                <div class="arabic-text">الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ</div>
+                <div class="english-text">"Who whispers in the hearts of mankind,"</div>
+            </div>
+
+            <div class="verse-display" id="verse-6-display">
+                <div class="verse-number">6</div>
+                <div class="arabic-text">مِنَ الْجِنَّةِ وَالنَّاسِ</div>
+                <div class="english-text">"From among the jinn and mankind."</div>
+            </div>
+        </div>
+
+        <div class="navigation-controls">
+            <button class="nav-button" id="prev-btn" onclick="previousVerse()">◀️ Previous</button>
+            <div class="verse-counter" id="verse-counter">Bismillah</div>
+            <button class="nav-button" id="next-btn" onclick="nextVerse()">Next ▶️</button>
+        </div>
+    </div>
+
+    <script>
+        let currentAudio = null;
+        let currentVerseIndex = 0; // 0 = Bismillah, 1-6 = verses
+        let isReciting = false;
+        let isPaused = false;
+        let autoAdvance = true;
+        
+        // Repeat mode variables
+        let repeatMode = 'none'; // 'none', 'verse', 'surah'
+        let repeatCount = 3;
+        let currentRepeatCount = 0;
+        let surahRepeatCount = 0;
+
+        const verses = [
+            { number: 'Bismillah', text: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", id: "bismillah-display", hasAudio: false },
+            { number: 1, text: "قُلْ أَعُوذُ بِرَبِّ النَّاسِ", id: "verse-1-display", hasAudio: true },
+            { number: 2, text: "مَلِكِ النَّاسِ", id: "verse-2-display", hasAudio: true },
+            { number: 3, text: "إِلَٰهِ النَّاسِ", id: "verse-3-display", hasAudio: true },
+            { number: 4, text: "مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ", id: "verse-4-display", hasAudio: true },
+            { number: 5, text: "الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ", id: "verse-5-display", hasAudio: true },
+            { number: 6, text: "مِنَ الْجِنَّةِ وَالنَّاسِ", id: "verse-6-display", hasAudio: true }
+        ];
+
+        function updateStatus(message) {
+            const statusElement = document.getElementById('status');
+            let fullMessage = message;
+            
+            // Add repeat info to status
+            if (repeatMode === 'verse' && currentRepeatCount > 0) {
+                const remaining = repeatCount === 'infinite' ? '∞' : (repeatCount - currentRepeatCount);
+                fullMessage += ` (Repeating: ${currentRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`;
+            } else if (repeatMode === 'surah' && surahRepeatCount > 0) {
+                const remaining = repeatCount === 'infinite' ? '∞' : (repeatCount - surahRepeatCount);
+                fullMessage += ` (Surah repeat: ${surahRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`;
+            }
+            
+            statusElement.textContent = fullMessage;
+        }
+
+        function changeRepeatMode() {
+            const selectedMode = document.querySelector('input[name="repeatMode"]:checked').value;
+            repeatMode = selectedMode;
+            
+            // Reset counters when changing mode
+            currentRepeatCount = 0;
+            surahRepeatCount = 0;
+            
+            updateStatus(`Repeat mode: ${repeatMode === 'none' ? 'No repeat' : 
+                        repeatMode === 'verse' ? 'Repeat current verse' : 'Repeat entire surah'}`);
+        }
+
+        function changeRepeatCount() {
+            const countSelect = document.getElementById('repeat-count');
+            repeatCount = countSelect.value === 'infinite' ? 'infinite' : parseInt(countSelect.value);
+            
+            updateStatus(`Repeat count set to: ${repeatCount === 'infinite' ? 'infinite' : repeatCount}`);
+        }
+
+        function updateVerseCounter() {
+            const counter = document.getElementById('verse-counter');
+            const current = verses[currentVerseIndex];
+            counter.textContent = current.number === 'Bismillah' ? 'Bismillah' : `Verse ${current.number} of 6`;
+        }
+
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            
+            prevBtn.disabled = currentVerseIndex === 0;
+            nextBtn.disabled = currentVerseIndex === verses.length - 1;
+        }
+
+        function showVerse(index, direction = 'right') {
+            // Hide all verses
+            document.querySelectorAll('.verse-display').forEach(verse => {
+                verse.classList.remove('active');
+                if (direction === 'right') {
+                    verse.classList.add('exit-left');
+                } else {
+                    verse.classList.add('exit-right');
+                }
+            });
+
+            // Show current verse after a short delay for animation
+            setTimeout(() => {
+                document.querySelectorAll('.verse-display').forEach(verse => {
+                    verse.classList.remove('exit-left', 'exit-right');
+                });
+                
+                const currentVerse = document.getElementById(verses[index].id);
+                currentVerse.classList.add('active');
+                
+                // Add highlight if currently reciting this verse
+                if (isReciting && currentVerseIndex === index) {
+                    currentVerse.classList.add('current-verse-highlight');
+                } else {
+                    currentVerse.classList.remove('current-verse-highlight');
+                }
+            }, 100);
+
+            updateVerseCounter();
+            updateNavigationButtons();
+        }
+
+        function nextVerse() {
+            if (currentVerseIndex < verses.length - 1) {
+                currentVerseIndex++;
+                showVerse(currentVerseIndex, 'right');
+                
+                // If reciting and auto-advance was disabled, re-enable it
+                if (isReciting) {
+                    autoAdvance = true;
+                }
+            }
+        }
+
+        function previousVerse() {
+            if (currentVerseIndex > 0) {
+                currentVerseIndex--;
+                showVerse(currentVerseIndex, 'left');
+                
+                // Disable auto-advance when manually navigating
+                autoAdvance = false;
+            }
+        }
+
+        async function loadAudio(verseNumber) {
+            const paddedVerse = verseNumber.toString().padStart(3, '0');
+            const audioUrl = `https://everyayah.com/data/Alafasy_128kbps/114${paddedVerse}.mp3`;
+            
+            console.log(`Loading Mishary Alafasy: ${audioUrl}`);
+            
+            try {
+                const audio = new Audio();
+                audio.crossOrigin = 'anonymous';
+                
+                const isLoaded = await new Promise((resolve) => {
+                    let loaded = false;
+                    
+                    const onLoad = () => {
+                        if (!loaded) {
+                            loaded = true;
+                            console.log('Audio loaded successfully');
+                            resolve(true);
+                        }
+                    };
+                    
+                    const onError = (e) => {
+                        if (!loaded) {
+                            loaded = true;
+                            console.log('Audio failed to load:', e);
+                            resolve(false);
+                        }
+                    };
+
+                    audio.addEventListener('canplaythrough', onLoad, { once: true });
+                    audio.addEventListener('loadeddata', onLoad, { once: true });
+                    audio.addEventListener('error', onError, { once: true });
+                    
+                    audio.src = audioUrl;
+                    audio.load();
+                    
+                    setTimeout(() => {
+                        if (!loaded) {
+                            loaded = true;
+                            console.log('Audio loading timeout');
+                            resolve(false);
+                        }
+                    }, 5000);
+                });
+
+                if (isLoaded) {
+                    return audioUrl;
+                } else {
+                    throw new Error('Alafasy audio not available');
+                }
+            } catch (error) {
+                console.error('Error loading Alafasy audio:', error);
+                throw error;
+            }
+        }
+
+        async function playCurrentVerse() {
+            const verse = verses[currentVerseIndex];
+            
+            // Skip Bismillah (has no audio)
+            if (!verse.hasAudio) {
+                if (autoAdvance && currentVerseIndex < verses.length - 1) {
+                    setTimeout(() => {
+                        currentVerseIndex++;
+                        showVerse(currentVerseIndex, 'right');
+                        playCurrentVerse();
+                    }, 2000); // Show Bismillah for 2 seconds
+                }
+                return;
+            }
+
+            updateStatus(`Loading Mishary Alafasy - verse ${verse.number}...`);
+
+            try {
+                const audioUrl = await loadAudio(verse.number);
+                
+                currentAudio = new Audio(audioUrl);
+                currentAudio.crossOrigin = 'anonymous';
+                updateStatus(`Reciting verse ${verse.number} - Mishary Alafasy`);
+
+                // Highlight current verse
+                document.getElementById(verse.id).classList.add('current-verse-highlight');
+
+                currentAudio.onended = function() {
+                    // Remove highlight
+                    document.getElementById(verse.id).classList.remove('current-verse-highlight');
+                    
+                    if (isReciting && !isPaused && autoAdvance) {
+                        // Handle repeat modes
+                        if (repeatMode === 'verse') {
+                            currentRepeatCount++;
+                            
+                            if (repeatCount === 'infinite' || currentRepeatCount < repeatCount) {
+                                // Repeat current verse
+                                setTimeout(() => {
+                                    playCurrentVerse();
+                                }, 1000);
+                                return;
+                            } else {
+                                // Finished repeating, move to next verse
+                                currentRepeatCount = 0;
+                            }
+                        }
+                        
+                        // Move to next verse
+                        if (currentVerseIndex < verses.length - 1) {
+                            setTimeout(() => {
+                                currentVerseIndex++;
+                                showVerse(currentVerseIndex, 'right');
+                                playCurrentVerse();
+                            }, 1500);
+                        } else {
+                            // End of surah - check surah repeat mode
+                            if (repeatMode === 'surah') {
+                                surahRepeatCount++;
+                                
+                                if (repeatCount === 'infinite' || surahRepeatCount < repeatCount) {
+                                    // Repeat entire surah
+                                    setTimeout(() => {
+                                        currentVerseIndex = 0; // Start from Bismillah
+                                        showVerse(currentVerseIndex, 'right');
+                                        playCurrentVerse();
+                                    }, 2000);
+                                    return;
+                                }
+                            }
+                            
+                            // Recitation complete
+                            stopRecitation();
+                        }
+                    }
+                };
+
+                currentAudio.onerror = function(event) {
+                    console.error('Audio playback error:', event);
+                    document.getElementById(verse.id).classList.remove('current-verse-highlight');
+                    updateStatus(`Audio error for verse ${verse.number}, skipping...`);
+                    
+                    if (autoAdvance) {
+                        setTimeout(() => {
+                            if (currentVerseIndex < verses.length - 1) {
+                                currentVerseIndex++;
+                                showVerse(currentVerseIndex, 'right');
+                                playCurrentVerse();
+                            }
+                        }, 1000);
+                    }
+                };
+
+                currentAudio.play().catch(error => {
+                    console.error('Play error:', error);
+                    document.getElementById(verse.id).classList.remove('current-verse-highlight');
+                    updateStatus(`Playback error for verse ${verse.number}, skipping...`);
+                    
+                    if (autoAdvance) {
+                        setTimeout(() => {
+                            if (currentVerseIndex < verses.length - 1) {
+                                currentVerseIndex++;
+                                showVerse(currentVerseIndex, 'right');
+                                playCurrentVerse();
+                            }
+                        }, 1000);
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error loading Alafasy audio:', error);
+                updateStatus(`Mishary Alafasy audio not available for verse ${verse.number}, skipping...`);
+                
+                if (autoAdvance) {
+                    setTimeout(() => {
+                        if (currentVerseIndex < verses.length - 1) {
+                            currentVerseIndex++;
+                            showVerse(currentVerseIndex, 'right');
+                            playCurrentVerse();
+                        }
+                    }, 1000);
+                }
+            }
+        }
+
+        function startRecitation() {
+            if (!isReciting) {
+                isReciting = true;
+                isPaused = false;
+                autoAdvance = true;
+                document.querySelector('.control-button').disabled = true;
+                updateStatus('Starting recitation...');
+                playCurrentVerse();
+            } else if (isPaused) {
+                // Resume from pause
+                isPaused = false;
+                autoAdvance = true;
+                if (currentAudio) {
+                    currentAudio.play().catch(error => {
+                        console.error('Resume error:', error);
+                        playCurrentVerse();
+                    });
+                    updateStatus(`Resuming verse ${verses[currentVerseIndex].number}...`);
+                } else {
+                    playCurrentVerse();
+                }
+            }
+        }
+
+        function pauseRecitation() {
+            if (isReciting && !isPaused) {
+                isPaused = true;
+                autoAdvance = false;
+                if (currentAudio) {
+                    currentAudio.pause();
+                }
+                updateStatus('Recitation paused');
+            }
+        }
+
+        function stopRecitation() {
+            isReciting = false;
+            isPaused = false;
+            autoAdvance = true;
+            
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+            
+            // Remove all highlights
+            document.querySelectorAll('.verse-display').forEach(verse => {
+                verse.classList.remove('current-verse-highlight');
+            });
+            
+            document.querySelector('.control-button').disabled = false;
+            updateStatus('Recitation stopped');
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            showVerse(0);
+            updateStatus('Ready to recite with Mishary Alafasy');
+        });
+    </script>
+</body>
+</html>
