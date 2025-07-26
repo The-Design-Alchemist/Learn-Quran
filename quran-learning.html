@@ -820,58 +820,89 @@
 
         async function loadAudio(verseNumber) {
             const paddedVerse = verseNumber.toString().padStart(3, '0');
-            const audioUrl = `https://everyayah.com/data/Alafasy_128kbps/114${paddedVerse}.mp3`;
             
-            console.log(`Loading Mishary Alafasy: ${audioUrl}`);
+            // Multiple audio sources for better iOS compatibility
+            const audioSources = [
+                `https://everyayah.com/data/Alafasy_128kbps/114${paddedVerse}.mp3`,
+                `https://server8.mp3quran.net/afs/114${paddedVerse}.mp3`,
+                `https://download.quranicaudio.com/quran/alafasy/114${paddedVerse}.mp3`
+            ];
             
-            try {
-                const audio = new Audio();
-                audio.crossOrigin = 'anonymous';
+            console.log(`Loading audio for verse ${verseNumber} on iOS/Safari...`);
+            
+            for (let i = 0; i < audioSources.length; i++) {
+                const audioUrl = audioSources[i];
+                console.log(`Trying source ${i + 1}: ${audioUrl}`);
                 
-                const isLoaded = await new Promise((resolve) => {
-                    let loaded = false;
+                try {
+                    const audio = new Audio();
                     
-                    const onLoad = () => {
-                        if (!loaded) {
-                            loaded = true;
-                            console.log('Audio loaded successfully');
-                            resolve(true);
-                        }
-                    };
+                    // iOS specific audio settings
+                    audio.preload = 'auto';
+                    audio.crossOrigin = 'anonymous';
                     
-                    const onError = (e) => {
-                        if (!loaded) {
-                            loaded = true;
-                            console.log('Audio failed to load:', e);
-                            resolve(false);
-                        }
-                    };
+                    // iOS Safari specific attributes
+                    if (audio.setAttribute) {
+                        audio.setAttribute('playsinline', 'true');
+                        audio.setAttribute('webkit-playsinline', 'true');
+                    }
+                    
+                    const isLoaded = await new Promise((resolve) => {
+                        let loaded = false;
+                        let timeout;
+                        
+                        const onSuccess = () => {
+                            if (!loaded) {
+                                loaded = true;
+                                clearTimeout(timeout);
+                                console.log(`✅ Audio source ${i + 1} loaded successfully`);
+                                resolve(true);
+                            }
+                        };
+                        
+                        const onError = (e) => {
+                            if (!loaded) {
+                                loaded = true;
+                                clearTimeout(timeout);
+                                console.log(`❌ Audio source ${i + 1} failed:`, e.type);
+                                resolve(false);
+                            }
+                        };
 
-                    audio.addEventListener('canplaythrough', onLoad, { once: true });
-                    audio.addEventListener('loadeddata', onLoad, { once: true });
-                    audio.addEventListener('error', onError, { once: true });
-                    
-                    audio.src = audioUrl;
-                    audio.load();
-                    
-                    setTimeout(() => {
-                        if (!loaded) {
-                            loaded = true;
-                            console.log('Audio loading timeout');
-                            resolve(false);
-                        }
-                    }, 5000);
-                });
+                        // Multiple event listeners for iOS compatibility
+                        audio.addEventListener('canplay', onSuccess, { once: true });
+                        audio.addEventListener('canplaythrough', onSuccess, { once: true });
+                        audio.addEventListener('loadeddata', onSuccess, { once: true });
+                        audio.addEventListener('loadedmetadata', onSuccess, { once: true });
+                        
+                        audio.addEventListener('error', onError, { once: true });
+                        audio.addEventListener('abort', onError, { once: true });
+                        
+                        // Set source and load
+                        audio.src = audioUrl;
+                        audio.load();
+                        
+                        // iOS needs longer timeout
+                        timeout = setTimeout(() => {
+                            if (!loaded) {
+                                loaded = true;
+                                console.log(`⏱️ Audio source ${i + 1} timeout after 8 seconds`);
+                                resolve(false);
+                            }
+                        }, 8000); // Increased timeout for iOS
+                    });
 
-                if (isLoaded) {
-                    return audioUrl;
-                } else {
-                    throw new Error('Alafasy audio not available');
+                    if (isLoaded) {
+                        console.log(`🎵 Successfully loaded audio from source ${i + 1}`);
+                        return audioUrl;
+                    }
+                } catch (error) {
+                    console.error(`Error with audio source ${i + 1}:`, error);
                 }
-            } catch (error) {
-                console.error('Error loading Alafasy audio:', error);
-                throw error;
             }
+            
+            // If all sources fail, throw error
+            throw new Error(`All audio sources failed for verse ${verseNumber}`);
         }
 
         async function playCurrentVerse() {
@@ -889,78 +920,99 @@
                 return;
             }
 
-            updateStatus(`Loading Mishary Alafasy - verse ${verse.number}...`);
+            updateStatus(`Loading verse ${verse.number} audio...`);
+            console.log(`🎵 Starting to load verse ${verse.number}`);
 
             try {
-                const audioUrl = await loadAudio(verse.number);
-                
                 // Stop previous audio completely
                 if (currentAudio) {
                     currentAudio.pause();
-                    currentAudio.removeEventListener('ended', currentAudio.endedHandler);
-                    currentAudio.removeEventListener('error', currentAudio.errorHandler);
+                    if (currentAudio.endedHandler) {
+                        currentAudio.removeEventListener('ended', currentAudio.endedHandler);
+                    }
+                    if (currentAudio.errorHandler) {
+                        currentAudio.removeEventListener('error', currentAudio.errorHandler);
+                    }
                     currentAudio = null;
                 }
+
+                const audioUrl = await loadAudio(verse.number);
+                console.log(`✅ Audio URL obtained: ${audioUrl}`);
                 
-                currentAudio = new Audio(audioUrl);
+                // Create new audio with iOS optimizations
+                currentAudio = new Audio();
+                currentAudio.preload = 'auto';
                 currentAudio.crossOrigin = 'anonymous';
                 
-                // iOS specific: Set audio session category
+                // iOS Safari specific settings
                 if (currentAudio.setAttribute) {
                     currentAudio.setAttribute('playsinline', 'true');
+                    currentAudio.setAttribute('webkit-playsinline', 'true');
                 }
                 
-                updateStatus(`Reciting verse ${verse.number} - Mishary Alafasy`);
+                // Set source
+                currentAudio.src = audioUrl;
+                
+                updateStatus(`Playing verse ${verse.number} - Mishary Alafasy`);
                 updateMediaSessionPlaybackState();
 
                 // Highlight current verse
                 document.getElementById(verse.id).classList.add('current-verse-highlight');
 
-                // Store event handlers so we can remove them later
+                // Store event handlers for cleanup
                 currentAudio.endedHandler = function() {
-                    console.log(`Verse ${verse.number} ended. isReciting: ${isReciting}, isPaused: ${isPaused}, autoAdvance: ${autoAdvance}`);
+                    console.log(`📝 Verse ${verse.number} playback ended`);
                     
                     // Remove highlight
                     document.getElementById(verse.id).classList.remove('current-verse-highlight');
                     
-                    // iOS fix: Add small delay to prevent rapid progression
+                    // iOS fix: Add delay to prevent rapid progression
                     setTimeout(() => {
                         if (isReciting && !isPaused && autoAdvance) {
+                            console.log(`➡️ Moving to handle verse completion`);
                             handleVerseCompletion();
                         }
-                    }, 500); // 500ms delay for iOS stability
+                    }, 800); // Increased delay for iOS stability
                 };
 
                 currentAudio.errorHandler = function(event) {
-                    console.error('Audio playback error:', event);
+                    console.error(`❌ Audio playback error for verse ${verse.number}:`, event);
                     document.getElementById(verse.id).classList.remove('current-verse-highlight');
-                    updateStatus(`Audio error for verse ${verse.number}, skipping...`);
+                    updateStatus(`Audio error for verse ${verse.number}, trying next...`);
                     
                     if (autoAdvance && isReciting && !isPaused) {
                         setTimeout(() => {
+                            console.log(`⏭️ Skipping to next verse due to error`);
                             handleVerseCompletion();
-                        }, 1000);
+                        }, 1500);
                     }
                 };
 
                 currentAudio.addEventListener('ended', currentAudio.endedHandler);
                 currentAudio.addEventListener('error', currentAudio.errorHandler);
 
-                // iOS fix: Ensure media session is active before playing
+                // iOS fix: Ensure media session is updated before playing
                 updateMediaSessionMetadata();
                 updateMediaSessionPlaybackState();
 
+                // Play with better error handling for iOS
+                console.log(`▶️ Attempting to play verse ${verse.number}`);
+                
                 await currentAudio.play();
-                console.log(`Successfully started playing verse ${verse.number}`);
+                console.log(`🎵 Successfully playing verse ${verse.number}`);
 
             } catch (error) {
-                console.error('Error loading/playing audio:', error);
-                updateStatus(`Audio not available for verse ${verse.number}, skipping...`);
+                console.error(`💥 Complete failure loading/playing verse ${verse.number}:`, error);
+                updateStatus(`Cannot load verse ${verse.number} audio. Skipping...`);
+                
+                // Remove highlight if it was added
+                document.getElementById(verse.id).classList.remove('current-verse-highlight');
                 
                 if (autoAdvance && isReciting && !isPaused) {
                     setTimeout(() => {
+                        console.log(`⏭️ Skipping verse ${verse.number} due to complete failure`);
                         handleVerseCompletion();
-                    }, 1000);
+                    }, 2000);
                 }
             }
         }
