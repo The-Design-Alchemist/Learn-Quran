@@ -516,6 +516,9 @@
         let currentRepeatCount = 0;
         let surahRepeatCount = 0;
 
+        // Media Session for notification controls
+        let mediaSession = null;
+
         const verses = [
             { number: 'Bismillah', text: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", id: "bismillah-display", hasAudio: false },
             { number: 1, text: "قُلْ أَعُوذُ بِرَبِّ النَّاسِ", id: "verse-1-display", hasAudio: true },
@@ -526,7 +529,124 @@
             { number: 6, text: "مِنَ الْجِنَّةِ وَالنَّاسِ", id: "verse-6-display", hasAudio: true }
         ];
 
-        function updateStatus(message) {
+        function setupMediaSession() {
+            if ('mediaSession' in navigator) {
+                mediaSession = navigator.mediaSession;
+                
+                // Set media session metadata
+                const currentVerse = verses[currentVerseIndex];
+                const verseTitle = currentVerse.number === 'Bismillah' ? 'Bismillah' : `Verse ${currentVerse.number}`;
+                
+                mediaSession.metadata = new MediaMetadata({
+                    title: verseTitle,
+                    artist: 'Mishary Rashid Alafasy',
+                    album: 'Surah An-Nas (The Mankind)',
+                    artwork: [
+                        { 
+                            src: 'data:image/svg+xml;base64,' + btoa(`
+                                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#4facfe"/>
+                                            <stop offset="100%" style="stop-color:#00f2fe"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect width="200" height="200" fill="url(#bg)"/>
+                                    <text x="100" y="70" text-anchor="middle" fill="white" font-size="24" font-weight="bold">القرآن الكريم</text>
+                                    <text x="100" y="100" text-anchor="middle" fill="white" font-size="16">Surah An-Nas</text>
+                                    <text x="100" y="130" text-anchor="middle" fill="white" font-size="14">${verseTitle}</text>
+                                    <text x="100" y="160" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="12">Mishary Alafasy</text>
+                                </svg>
+                            `),
+                            sizes: '200x200',
+                            type: 'image/svg+xml'
+                        }
+                    ]
+                });
+
+                // Set up action handlers
+                mediaSession.setActionHandler('play', () => {
+                    if (isPaused) {
+                        startRecitation();
+                    } else if (!isReciting) {
+                        startRecitation();
+                    }
+                });
+
+                mediaSession.setActionHandler('pause', () => {
+                    pauseRecitation();
+                });
+
+                mediaSession.setActionHandler('stop', () => {
+                    stopRecitation();
+                });
+
+                mediaSession.setActionHandler('previoustrack', () => {
+                    if (currentVerseIndex > 0) {
+                        previousVerse();
+                        if (isReciting) {
+                            setTimeout(() => playCurrentVerse(), 500);
+                        }
+                    }
+                });
+
+                mediaSession.setActionHandler('nexttrack', () => {
+                    if (currentVerseIndex < verses.length - 1) {
+                        nextVerse();
+                        if (isReciting) {
+                            setTimeout(() => playCurrentVerse(), 500);
+                        }
+                    }
+                });
+
+                // Set initial playback state
+                mediaSession.playbackState = 'none';
+                
+                console.log('Media Session initialized successfully');
+            } else {
+                console.log('Media Session API not supported in this browser');
+            }
+        }
+
+        function updateMediaSessionMetadata() {
+            if (mediaSession) {
+                const currentVerse = verses[currentVerseIndex];
+                const verseTitle = currentVerse.number === 'Bismillah' ? 'Bismillah' : `Verse ${currentVerse.number}`;
+                
+                mediaSession.metadata = new MediaMetadata({
+                    title: verseTitle,
+                    artist: 'Mishary Rashid Alafasy',
+                    album: 'Surah An-Nas (The Mankind)',
+                    artwork: [
+                        { 
+                            src: 'data:image/svg+xml;base64,' + btoa(`
+                                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#4facfe"/>
+                                            <stop offset="100%" style="stop-color:#00f2fe"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect width="200" height="200" fill="url(#bg)"/>
+                                    <text x="100" y="70" text-anchor="middle" fill="white" font-size="24" font-weight="bold">القرآن الكريم</text>
+                                    <text x="100" y="100" text-anchor="middle" fill="white" font-size="16">Surah An-Nas</text>
+                                    <text x="100" y="130" text-anchor="middle" fill="white" font-size="14">${verseTitle}</text>
+                                    <text x="100" y="160" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="12">Mishary Alafasy</text>
+                                </svg>
+                            `),
+                            sizes: '200x200',
+                            type: 'image/svg+xml'
+                        }
+                    ]
+                });
+            }
+        }
+
+        function updateMediaSessionPlaybackState(state) {
+            if (mediaSession) {
+                mediaSession.playbackState = state; // 'playing', 'paused', 'none'
+            }
+        }
             const statusElement = document.getElementById('status');
             let fullMessage = message;
             
@@ -605,6 +725,9 @@
 
             updateVerseCounter();
             updateNavigationButtons();
+            
+            // Update media session metadata when verse changes
+            updateMediaSessionMetadata();
         }
 
         function nextVerse() {
@@ -766,6 +889,7 @@
                     console.error('Audio playback error:', event);
                     document.getElementById(verse.id).classList.remove('current-verse-highlight');
                     updateStatus(`Audio error for verse ${verse.number}, skipping...`);
+                    updateMediaSessionPlaybackState('paused');
                     
                     if (autoAdvance) {
                         setTimeout(() => {
@@ -778,10 +902,13 @@
                     }
                 };
 
-                currentAudio.play().catch(error => {
+                currentAudio.play().then(() => {
+                    updateMediaSessionPlaybackState('playing');
+                }).catch(error => {
                     console.error('Play error:', error);
                     document.getElementById(verse.id).classList.remove('current-verse-highlight');
                     updateStatus(`Playback error for verse ${verse.number}, skipping...`);
+                    updateMediaSessionPlaybackState('paused');
                     
                     if (autoAdvance) {
                         setTimeout(() => {
@@ -867,6 +994,7 @@
         // Initialize
         window.addEventListener('load', () => {
             showVerse(0);
+            setupMediaSession();
             updateStatus('Ready to recite with Mishary Alafasy');
         });
     </script>
