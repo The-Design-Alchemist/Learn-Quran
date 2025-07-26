@@ -660,7 +660,7 @@
             }
             
             statusElement.textContent = fullMessage;
-        }
+        
 
         function changeRepeatMode() {
             const selectedMode = document.querySelector('input[name="repeatMode"]:checked').value;
@@ -937,6 +937,8 @@
             }
         }
 
+        
+
         function startRecitation() {
             if (!isReciting) {
                 isReciting = true;
@@ -997,6 +999,9 @@
             setupMediaSession();
             updateStatus('Ready to recite with Mishary Alafasy');
         });
+    </script>
+</body>
+</html>
     </script>
 </body>
 </html>
