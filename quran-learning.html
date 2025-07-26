@@ -526,6 +526,85 @@
             { number: 6, text: "مِنَ الْجِنَّةِ وَالنَّاسِ", id: "verse-6-display", hasAudio: true }
         ];
 
+        // Media Session API for notification controls
+        function initializeMediaSession() {
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: `Surah An-Nas (${verses[currentVerseIndex].number === 'Bismillah' ? 'Bismillah' : `Verse ${verses[currentVerseIndex].number}`})`,
+                    artist: 'Mishary Rashid Alafasy',
+                    album: 'Quran - Chapter 114',
+                    artwork: [
+                        { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23667eea;stop-opacity:1" /><stop offset="100%" style="stop-color:%23764ba2;stop-opacity:1" /></linearGradient></defs><rect width="512" height="512" fill="url(%23grad1)"/><text x="256" y="180" font-family="Arial, sans-serif" font-size="120" font-weight="bold" text-anchor="middle" fill="white">القرآن</text><text x="256" y="280" font-family="Arial, sans-serif" font-size="48" text-anchor="middle" fill="white" opacity="0.9">Surah An-Nas</text><text x="256" y="340" font-family="Arial, sans-serif" font-size="32" text-anchor="middle" fill="white" opacity="0.8">Chapter 114</text><text x="256" y="400" font-family="Arial, sans-serif" font-size="28" text-anchor="middle" fill="white" opacity="0.7">Mishary Alafasy</text></svg>', sizes: '512x512', type: 'image/svg+xml' }
+                    ]
+                });
+
+                navigator.mediaSession.setActionHandler('play', () => {
+                    startRecitation();
+                });
+
+                navigator.mediaSession.setActionHandler('pause', () => {
+                    pauseRecitation();
+                });
+
+                navigator.mediaSession.setActionHandler('stop', () => {
+                    stopRecitation();
+                });
+
+                navigator.mediaSession.setActionHandler('previoustrack', () => {
+                    previousVerse();
+                    if (isReciting && !isPaused) {
+                        // If reciting, play the new verse
+                        setTimeout(() => {
+                            playCurrentVerse();
+                        }, 500);
+                    }
+                });
+
+                navigator.mediaSession.setActionHandler('nexttrack', () => {
+                    nextVerse();
+                    if (isReciting && !isPaused) {
+                        // If reciting, play the new verse
+                        setTimeout(() => {
+                            playCurrentVerse();
+                        }, 500);
+                    }
+                });
+
+                // Set initial playback state
+                navigator.mediaSession.playbackState = 'none';
+            }
+        }
+
+        function updateMediaSessionMetadata() {
+            if ('mediaSession' in navigator) {
+                const currentVerse = verses[currentVerseIndex];
+                const title = currentVerse.number === 'Bismillah' ? 
+                    'Bismillah' : 
+                    `Verse ${currentVerse.number} of 6`;
+                
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: title,
+                    artist: 'Mishary Rashid Alafasy',
+                    album: 'Surah An-Nas - Chapter 114',
+                    artwork: [
+                        { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23667eea;stop-opacity:1" /><stop offset="100%" style="stop-color:%23764ba2;stop-opacity:1" /></linearGradient></defs><rect width="512" height="512" fill="url(%23grad1)"/><text x="256" y="150" font-family="Arial, sans-serif" font-size="100" font-weight="bold" text-anchor="middle" fill="white">القرآن</text><text x="256" y="220" font-family="Arial, sans-serif" font-size="36" text-anchor="middle" fill="white" opacity="0.9">Surah An-Nas</text><text x="256" y="280" font-family="Arial, sans-serif" font-size="48" font-weight="bold" text-anchor="middle" fill="white">' + (currentVerse.number === 'Bismillah' ? 'بِسْمِ اللَّهِ' : currentVerse.number) + '</text><text x="256" y="340" font-family="Arial, sans-serif" font-size="28" text-anchor="middle" fill="white" opacity="0.8">' + title + '</text><text x="256" y="400" font-family="Arial, sans-serif" font-size="24" text-anchor="middle" fill="white" opacity="0.7">Mishary Alafasy</text></svg>', sizes: '512x512', type: 'image/svg+xml' }
+                    ]
+                });
+            }
+        }
+
+        function updateMediaSessionPlaybackState() {
+            if ('mediaSession' in navigator) {
+                if (isReciting && !isPaused) {
+                    navigator.mediaSession.playbackState = 'playing';
+                } else if (isPaused) {
+                    navigator.mediaSession.playbackState = 'paused';
+                } else {
+                    navigator.mediaSession.playbackState = 'none';
+                }
+            }
+        }
+
         function updateStatus(message) {
             const statusElement = document.getElementById('status');
             let fullMessage = message;
@@ -605,6 +684,7 @@
 
             updateVerseCounter();
             updateNavigationButtons();
+            updateMediaSessionMetadata();
         }
 
         function nextVerse() {
@@ -817,11 +897,13 @@
                 autoAdvance = true;
                 document.querySelector('.control-button').disabled = true;
                 updateStatus('Starting recitation...');
+                updateMediaSessionPlaybackState();
                 playCurrentVerse();
             } else if (isPaused) {
                 // Resume from pause
                 isPaused = false;
                 autoAdvance = true;
+                updateMediaSessionPlaybackState();
                 if (currentAudio) {
                     currentAudio.play().catch(error => {
                         console.error('Resume error:', error);
@@ -838,6 +920,7 @@
             if (isReciting && !isPaused) {
                 isPaused = true;
                 autoAdvance = false;
+                updateMediaSessionPlaybackState();
                 if (currentAudio) {
                     currentAudio.pause();
                 }
@@ -861,6 +944,7 @@
             });
             
             document.querySelector('.control-button').disabled = false;
+            updateMediaSessionPlaybackState();
             updateStatus('Recitation stopped');
         }
 
@@ -868,6 +952,8 @@
         window.addEventListener('load', () => {
             showVerse(0);
             updateStatus('Ready to recite with Mishary Alafasy');
+            initializeMediaSession();
+            updateMediaSessionMetadata();
         });
     </script>
 </body>
