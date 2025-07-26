@@ -599,12 +599,40 @@
                     if (isReciting && !isPaused) {
                         navigator.mediaSession.playbackState = 'playing';
                         console.log('Media session state: playing');
+                        
+                        // iOS fix: Continuously assert playing state
+                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                        if (isIOS) {
+                            // Keep asserting playing state every few seconds on iOS
+                            if (!window.iosPlayingStateInterval) {
+                                window.iosPlayingStateInterval = setInterval(() => {
+                                    if (isReciting && !isPaused && navigator.mediaSession) {
+                                        navigator.mediaSession.playbackState = 'playing';
+                                    } else if (window.iosPlayingStateInterval) {
+                                        clearInterval(window.iosPlayingStateInterval);
+                                        window.iosPlayingStateInterval = null;
+                                    }
+                                }, 2000); // Every 2 seconds
+                            }
+                        }
                     } else if (isPaused) {
                         navigator.mediaSession.playbackState = 'paused';
                         console.log('Media session state: paused');
+                        
+                        // Clear iOS interval if paused
+                        if (window.iosPlayingStateInterval) {
+                            clearInterval(window.iosPlayingStateInterval);
+                            window.iosPlayingStateInterval = null;
+                        }
                     } else {
                         navigator.mediaSession.playbackState = 'none';
                         console.log('Media session state: none');
+                        
+                        // Clear iOS interval if stopped
+                        if (window.iosPlayingStateInterval) {
+                            clearInterval(window.iosPlayingStateInterval);
+                            window.iosPlayingStateInterval = null;
+                        }
                     }
                 } catch (error) {
                     console.error('Error updating media session playback state:', error);
@@ -1017,7 +1045,6 @@
                 currentAudio = newAudio;
                 
                 updateStatus(`Playing verse ${verse.number} - Mishary Alafasy`);
-                updateMediaSessionPlaybackState();
 
                 // Highlight current verse
                 document.getElementById(verse.id).classList.add('current-verse-highlight');
@@ -1029,13 +1056,18 @@
                     // Remove highlight
                     document.getElementById(verse.id).classList.remove('current-verse-highlight');
                     
-                    // iOS fix: Add delay to prevent rapid progression
+                    // iOS fix: Maintain media session state to prevent pause
+                    if ('mediaSession' in navigator) {
+                        navigator.mediaSession.playbackState = 'playing';
+                    }
+                    
+                    // iOS fix: Minimal delay but ensure continuation
                     setTimeout(() => {
                         if (isReciting && !isPaused && autoAdvance) {
                             console.log(`➡️ Moving to handle verse completion`);
                             handleVerseCompletion();
                         }
-                    }, 800);
+                    }, 300); // Reduced delay to maintain flow
                 };
 
                 currentAudio.errorHandler = function(event) {
@@ -1054,9 +1086,9 @@
                 currentAudio.addEventListener('ended', currentAudio.endedHandler);
                 currentAudio.addEventListener('error', currentAudio.errorHandler);
 
-                // iOS fix: Ensure media session is updated before playing
+                // iOS fix: Update media session BEFORE playing to maintain state
                 updateMediaSessionMetadata();
-                updateMediaSessionPlaybackState();
+                navigator.mediaSession.playbackState = 'playing';
 
                 // Play with better error handling for iOS
                 console.log(`▶️ Attempting to play verse ${verse.number}`);
@@ -1083,6 +1115,11 @@
         function handleVerseCompletion() {
             console.log('Handling verse completion...');
             
+            // iOS fix: Explicitly maintain playing state
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'playing';
+            }
+            
             // Handle repeat modes
             if (repeatMode === 'verse') {
                 currentRepeatCount++;
@@ -1093,22 +1130,26 @@
                     updateStatus(`Repeating verse ${verses[currentVerseIndex].number} (${currentRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`);
                     
                     if (currentAudio && currentAudio.src) {
-                        // iOS fix: Reuse existing audio object for repeats
+                        // iOS fix: Immediate restart for smoother experience
                         setTimeout(() => {
                             if (isReciting && !isPaused) {
+                                // Keep media session active
+                                if ('mediaSession' in navigator) {
+                                    navigator.mediaSession.playbackState = 'playing';
+                                }
                                 currentAudio.currentTime = 0;
                                 currentAudio.play().catch(error => {
                                     console.error('Repeat play error:', error);
                                     playCurrentVerse(); // Fallback to new audio
                                 });
                             }
-                        }, 1000);
+                        }, 500); // Reduced delay for smoother experience
                     } else {
                         setTimeout(() => {
                             if (isReciting && !isPaused) {
                                 playCurrentVerse();
                             }
-                        }, 1000);
+                        }, 500);
                     }
                     return;
                 } else {
@@ -1119,19 +1160,24 @@
             
             // Move to next verse
             if (currentVerseIndex < verses.length - 1) {
+                // iOS fix: Faster transition to maintain flow
                 setTimeout(() => {
                     if (isReciting && !isPaused && autoAdvance) {
                         currentVerseIndex++;
                         showVerse(currentVerseIndex, 'right');
                         
-                        // iOS fix: Longer delay before loading next audio
+                        // iOS fix: Immediate transition to prevent pause
                         setTimeout(() => {
                             if (isReciting && !isPaused) {
+                                // Maintain playing state throughout
+                                if ('mediaSession' in navigator) {
+                                    navigator.mediaSession.playbackState = 'playing';
+                                }
                                 playCurrentVerse();
                             }
-                        }, 1000); // Additional delay for iOS audio transition
+                        }, 200); // Very short delay for iOS
                     }
-                }, 1500);
+                }, 500); // Reduced main delay
             } else {
                 // End of surah - check surah repeat mode
                 if (repeatMode === 'surah') {
@@ -1143,15 +1189,19 @@
                         updateStatus(`Repeating Surah (${surahRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`);
                         setTimeout(() => {
                             if (isReciting && !isPaused) {
+                                // Maintain playing state
+                                if ('mediaSession' in navigator) {
+                                    navigator.mediaSession.playbackState = 'playing';
+                                }
                                 currentVerseIndex = 0; // Start from Bismillah
                                 showVerse(currentVerseIndex, 'right');
                                 setTimeout(() => {
                                     if (isReciting && !isPaused) {
                                         playCurrentVerse();
                                     }
-                                }, 1000);
+                                }, 200);
                             }
-                        }, 2000);
+                        }, 1000);
                         return;
                     }
                 }
