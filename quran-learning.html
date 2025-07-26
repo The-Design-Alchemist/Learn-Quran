@@ -529,14 +529,8 @@
         // Media Session API for notification controls
         function initializeMediaSession() {
             if ('mediaSession' in navigator) {
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: `Surah An-Nas (${verses[currentVerseIndex].number === 'Bismillah' ? 'Bismillah' : `Verse ${verses[currentVerseIndex].number}`})`,
-                    artist: 'Mishary Rashid Alafasy',
-                    album: 'Quran - Chapter 114',
-                    artwork: [
-                        { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23667eea;stop-opacity:1" /><stop offset="100%" style="stop-color:%23764ba2;stop-opacity:1" /></linearGradient></defs><rect width="512" height="512" fill="url(%23grad1)"/><text x="256" y="180" font-family="Arial, sans-serif" font-size="120" font-weight="bold" text-anchor="middle" fill="white">القرآن</text><text x="256" y="280" font-family="Arial, sans-serif" font-size="48" text-anchor="middle" fill="white" opacity="0.9">Surah An-Nas</text><text x="256" y="340" font-family="Arial, sans-serif" font-size="32" text-anchor="middle" fill="white" opacity="0.8">Chapter 114</text><text x="256" y="400" font-family="Arial, sans-serif" font-size="28" text-anchor="middle" fill="white" opacity="0.7">Mishary Alafasy</text></svg>', sizes: '512x512', type: 'image/svg+xml' }
-                    ]
-                });
+                // iOS fix: Set initial metadata first
+                updateMediaSessionMetadata();
 
                 // Basic playback controls
                 navigator.mediaSession.setActionHandler('play', () => {
@@ -554,43 +548,67 @@
                     stopRecitation();
                 });
 
-                // Navigation controls
-                navigator.mediaSession.setActionHandler('previoustrack', () => {
-                    console.log('Media Session: Previous track pressed');
-                    handlePreviousFromMedia();
-                });
+                // Navigation controls - iOS has limited support, but we'll try all options
+                try {
+                    navigator.mediaSession.setActionHandler('previoustrack', () => {
+                        console.log('Media Session: Previous track pressed');
+                        handlePreviousFromMedia();
+                    });
+                } catch (e) {
+                    console.log('Previous track not supported');
+                }
 
-                navigator.mediaSession.setActionHandler('nexttrack', () => {
-                    console.log('Media Session: Next track pressed');
-                    handleNextFromMedia();
-                });
+                try {
+                    navigator.mediaSession.setActionHandler('nexttrack', () => {
+                        console.log('Media Session: Next track pressed');
+                        handleNextFromMedia();
+                    });
+                } catch (e) {
+                    console.log('Next track not supported');
+                }
 
-                // Seek controls (for fine-grained control)
-                navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-                    console.log('Media Session: Seek backward pressed');
-                    handlePreviousFromMedia();
-                });
+                // iOS fallback controls
+                try {
+                    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                        console.log('Media Session: Seek backward pressed');
+                        handlePreviousFromMedia();
+                    });
+                } catch (e) {
+                    console.log('Seek backward not supported');
+                }
 
-                navigator.mediaSession.setActionHandler('seekforward', (details) => {
-                    console.log('Media Session: Seek forward pressed');
-                    handleNextFromMedia();
-                });
-
-                // Skip controls (alternative to next/previous)
-                navigator.mediaSession.setActionHandler('skipbackward', () => {
-                    console.log('Media Session: Skip backward pressed');
-                    handlePreviousFromMedia();
-                });
-
-                navigator.mediaSession.setActionHandler('skipforward', () => {
-                    console.log('Media Session: Skip forward pressed');
-                    handleNextFromMedia();
-                });
+                try {
+                    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                        console.log('Media Session: Seek forward pressed');
+                        handleNextFromMedia();
+                    });
+                } catch (e) {
+                    console.log('Seek forward not supported');
+                }
 
                 // Set initial playback state
                 navigator.mediaSession.playbackState = 'none';
                 
-                console.log('Media Session initialized with all controls');
+                console.log('Media Session initialized with iOS compatibility');
+            }
+        }
+
+        function updateMediaSessionPlaybackState() {
+            if ('mediaSession' in navigator) {
+                try {
+                    if (isReciting && !isPaused) {
+                        navigator.mediaSession.playbackState = 'playing';
+                        console.log('Media session state: playing');
+                    } else if (isPaused) {
+                        navigator.mediaSession.playbackState = 'paused';
+                        console.log('Media session state: paused');
+                    } else {
+                        navigator.mediaSession.playbackState = 'none';
+                        console.log('Media session state: none');
+                    }
+                } catch (error) {
+                    console.error('Error updating media session playback state:', error);
+                }
             }
         }
 
@@ -876,143 +894,184 @@
             try {
                 const audioUrl = await loadAudio(verse.number);
                 
+                // Stop previous audio completely
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.removeEventListener('ended', currentAudio.endedHandler);
+                    currentAudio.removeEventListener('error', currentAudio.errorHandler);
+                    currentAudio = null;
+                }
+                
                 currentAudio = new Audio(audioUrl);
                 currentAudio.crossOrigin = 'anonymous';
+                
+                // iOS specific: Set audio session category
+                if (currentAudio.setAttribute) {
+                    currentAudio.setAttribute('playsinline', 'true');
+                }
+                
                 updateStatus(`Reciting verse ${verse.number} - Mishary Alafasy`);
+                updateMediaSessionPlaybackState();
 
                 // Highlight current verse
                 document.getElementById(verse.id).classList.add('current-verse-highlight');
 
-                currentAudio.onended = function() {
+                // Store event handlers so we can remove them later
+                currentAudio.endedHandler = function() {
+                    console.log(`Verse ${verse.number} ended. isReciting: ${isReciting}, isPaused: ${isPaused}, autoAdvance: ${autoAdvance}`);
+                    
                     // Remove highlight
                     document.getElementById(verse.id).classList.remove('current-verse-highlight');
                     
-                    if (isReciting && !isPaused && autoAdvance) {
-                        // Handle repeat modes
-                        if (repeatMode === 'verse') {
-                            currentRepeatCount++;
-                            
-                            if (repeatCount === 'infinite' || currentRepeatCount < repeatCount) {
-                                // Repeat current verse
-                                setTimeout(() => {
-                                    playCurrentVerse();
-                                }, 1000);
-                                return;
-                            } else {
-                                // Finished repeating, move to next verse
-                                currentRepeatCount = 0;
-                            }
+                    // iOS fix: Add small delay to prevent rapid progression
+                    setTimeout(() => {
+                        if (isReciting && !isPaused && autoAdvance) {
+                            handleVerseCompletion();
                         }
-                        
-                        // Move to next verse
-                        if (currentVerseIndex < verses.length - 1) {
-                            setTimeout(() => {
-                                currentVerseIndex++;
-                                showVerse(currentVerseIndex, 'right');
-                                playCurrentVerse();
-                            }, 1500);
-                        } else {
-                            // End of surah - check surah repeat mode
-                            if (repeatMode === 'surah') {
-                                surahRepeatCount++;
-                                
-                                if (repeatCount === 'infinite' || surahRepeatCount < repeatCount) {
-                                    // Repeat entire surah
-                                    setTimeout(() => {
-                                        currentVerseIndex = 0; // Start from Bismillah
-                                        showVerse(currentVerseIndex, 'right');
-                                        playCurrentVerse();
-                                    }, 2000);
-                                    return;
-                                }
-                            }
-                            
-                            // Recitation complete
-                            stopRecitation();
-                        }
-                    }
+                    }, 500); // 500ms delay for iOS stability
                 };
 
-                currentAudio.onerror = function(event) {
+                currentAudio.errorHandler = function(event) {
                     console.error('Audio playback error:', event);
                     document.getElementById(verse.id).classList.remove('current-verse-highlight');
                     updateStatus(`Audio error for verse ${verse.number}, skipping...`);
                     
-                    if (autoAdvance) {
+                    if (autoAdvance && isReciting && !isPaused) {
                         setTimeout(() => {
-                            if (currentVerseIndex < verses.length - 1) {
-                                currentVerseIndex++;
-                                showVerse(currentVerseIndex, 'right');
-                                playCurrentVerse();
-                            }
+                            handleVerseCompletion();
                         }, 1000);
                     }
                 };
 
-                currentAudio.play().catch(error => {
-                    console.error('Play error:', error);
-                    document.getElementById(verse.id).classList.remove('current-verse-highlight');
-                    updateStatus(`Playback error for verse ${verse.number}, skipping...`);
-                    
-                    if (autoAdvance) {
-                        setTimeout(() => {
-                            if (currentVerseIndex < verses.length - 1) {
-                                currentVerseIndex++;
-                                showVerse(currentVerseIndex, 'right');
-                                playCurrentVerse();
-                            }
-                        }, 1000);
-                    }
-                });
+                currentAudio.addEventListener('ended', currentAudio.endedHandler);
+                currentAudio.addEventListener('error', currentAudio.errorHandler);
+
+                // iOS fix: Ensure media session is active before playing
+                updateMediaSessionMetadata();
+                updateMediaSessionPlaybackState();
+
+                await currentAudio.play();
+                console.log(`Successfully started playing verse ${verse.number}`);
 
             } catch (error) {
-                console.error('Error loading Alafasy audio:', error);
-                updateStatus(`Mishary Alafasy audio not available for verse ${verse.number}, skipping...`);
+                console.error('Error loading/playing audio:', error);
+                updateStatus(`Audio not available for verse ${verse.number}, skipping...`);
                 
-                if (autoAdvance) {
+                if (autoAdvance && isReciting && !isPaused) {
                     setTimeout(() => {
-                        if (currentVerseIndex < verses.length - 1) {
-                            currentVerseIndex++;
-                            showVerse(currentVerseIndex, 'right');
-                            playCurrentVerse();
-                        }
+                        handleVerseCompletion();
                     }, 1000);
                 }
             }
         }
 
+        function handleVerseCompletion() {
+            console.log('Handling verse completion...');
+            
+            // Handle repeat modes
+            if (repeatMode === 'verse') {
+                currentRepeatCount++;
+                console.log(`Verse repeat: ${currentRepeatCount}/${repeatCount}`);
+                
+                if (repeatCount === 'infinite' || currentRepeatCount < repeatCount) {
+                    // Repeat current verse - iOS fix: add delay
+                    updateStatus(`Repeating verse ${verses[currentVerseIndex].number} (${currentRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`);
+                    setTimeout(() => {
+                        if (isReciting && !isPaused) {
+                            playCurrentVerse();
+                        }
+                    }, 1000); // 1 second delay for iOS
+                    return;
+                } else {
+                    // Finished repeating, move to next verse
+                    currentRepeatCount = 0;
+                }
+            }
+            
+            // Move to next verse
+            if (currentVerseIndex < verses.length - 1) {
+                setTimeout(() => {
+                    if (isReciting && !isPaused && autoAdvance) {
+                        currentVerseIndex++;
+                        showVerse(currentVerseIndex, 'right');
+                        playCurrentVerse();
+                    }
+                }, 1500); // Increased delay for iOS
+            } else {
+                // End of surah - check surah repeat mode
+                if (repeatMode === 'surah') {
+                    surahRepeatCount++;
+                    console.log(`Surah repeat: ${surahRepeatCount}/${repeatCount}`);
+                    
+                    if (repeatCount === 'infinite' || surahRepeatCount < repeatCount) {
+                        // Repeat entire surah
+                        updateStatus(`Repeating Surah (${surahRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`);
+                        setTimeout(() => {
+                            if (isReciting && !isPaused) {
+                                currentVerseIndex = 0; // Start from Bismillah
+                                showVerse(currentVerseIndex, 'right');
+                                playCurrentVerse();
+                            }
+                        }, 2000); // 2 second delay for surah repeat
+                        return;
+                    }
+                }
+                
+                // Recitation complete
+                console.log('Recitation completed');
+                stopRecitation();
+            }
+        }
+
         function startRecitation() {
+            console.log('Starting recitation...');
+            
             if (!isReciting) {
                 isReciting = true;
                 isPaused = false;
                 autoAdvance = true;
+                currentRepeatCount = 0;
+                surahRepeatCount = 0;
+                
                 document.querySelector('.control-button').disabled = true;
                 updateStatus('Starting recitation...');
                 updateMediaSessionPlaybackState();
-                playCurrentVerse();
+                
+                // iOS fix: Small delay before starting playback
+                setTimeout(() => {
+                    playCurrentVerse();
+                }, 200);
+                
             } else if (isPaused) {
+                console.log('Resuming from pause...');
                 // Resume from pause
                 isPaused = false;
                 autoAdvance = true;
                 updateMediaSessionPlaybackState();
-                if (currentAudio) {
+                
+                if (currentAudio && !currentAudio.ended) {
                     currentAudio.play().catch(error => {
                         console.error('Resume error:', error);
+                        // If resume fails, restart current verse
                         playCurrentVerse();
                     });
                     updateStatus(`Resuming verse ${verses[currentVerseIndex].number}...`);
                 } else {
+                    // Audio ended or doesn't exist, restart current verse
                     playCurrentVerse();
                 }
             }
         }
 
         function pauseRecitation() {
+            console.log('Pausing recitation...');
+            
             if (isReciting && !isPaused) {
                 isPaused = true;
                 autoAdvance = false;
                 updateMediaSessionPlaybackState();
-                if (currentAudio) {
+                
+                if (currentAudio && !currentAudio.paused) {
                     currentAudio.pause();
                 }
                 updateStatus('Recitation paused');
@@ -1020,13 +1079,25 @@
         }
 
         function stopRecitation() {
+            console.log('Stopping recitation...');
+            
             isReciting = false;
             isPaused = false;
             autoAdvance = true;
+            currentRepeatCount = 0;
+            surahRepeatCount = 0;
             
             if (currentAudio) {
                 currentAudio.pause();
                 currentAudio.currentTime = 0;
+                // iOS fix: Properly clean up event listeners
+                if (currentAudio.endedHandler) {
+                    currentAudio.removeEventListener('ended', currentAudio.endedHandler);
+                }
+                if (currentAudio.errorHandler) {
+                    currentAudio.removeEventListener('error', currentAudio.errorHandler);
+                }
+                currentAudio = null;
             }
             
             // Remove all highlights
