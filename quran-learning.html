@@ -905,6 +905,43 @@
             throw new Error(`All audio sources failed for verse ${verseNumber}`);
         }
 
+        // iOS-specific initialization
+        function initializeForIOS() {
+            // Check if we're on iOS
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            
+            if (isIOS) {
+                console.log('🍎 iOS detected - applying iOS-specific optimizations');
+                
+                // Pre-load first verse audio on user interaction
+                document.addEventListener('click', function preloadFirstVerse() {
+                    if (!currentAudio) {
+                        console.log('📱 Pre-loading first verse for iOS...');
+                        loadAudio(1).then(audioUrl => {
+                            const preloadAudio = new Audio(audioUrl);
+                            preloadAudio.preload = 'auto';
+                            preloadAudio.load();
+                            console.log('✅ First verse pre-loaded for iOS');
+                        }).catch(error => {
+                            console.log('❌ Failed to pre-load first verse:', error);
+                        });
+                    }
+                    document.removeEventListener('click', preloadFirstVerse);
+                }, { once: true });
+                
+                // Add iOS-specific styles
+                const style = document.createElement('style');
+                style.textContent = `
+                    audio {
+                        -webkit-playsinline: true;
+                        playsinline: true;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+
         async function playCurrentVerse() {
             const verse = verses[currentVerseIndex];
             
@@ -924,34 +961,60 @@
             console.log(`🎵 Starting to load verse ${verse.number}`);
 
             try {
-                // Stop previous audio completely
-                if (currentAudio) {
-                    currentAudio.pause();
-                    if (currentAudio.endedHandler) {
-                        currentAudio.removeEventListener('ended', currentAudio.endedHandler);
-                    }
-                    if (currentAudio.errorHandler) {
-                        currentAudio.removeEventListener('error', currentAudio.errorHandler);
-                    }
-                    currentAudio = null;
-                }
-
+                // iOS fix: Keep reference to previous audio for smoother transitions
+                const previousAudio = currentAudio;
+                
                 const audioUrl = await loadAudio(verse.number);
                 console.log(`✅ Audio URL obtained: ${audioUrl}`);
                 
                 // Create new audio with iOS optimizations
-                currentAudio = new Audio();
-                currentAudio.preload = 'auto';
-                currentAudio.crossOrigin = 'anonymous';
+                const newAudio = new Audio();
+                newAudio.preload = 'auto';
+                newAudio.crossOrigin = 'anonymous';
                 
                 // iOS Safari specific settings
-                if (currentAudio.setAttribute) {
-                    currentAudio.setAttribute('playsinline', 'true');
-                    currentAudio.setAttribute('webkit-playsinline', 'true');
+                if (newAudio.setAttribute) {
+                    newAudio.setAttribute('playsinline', 'true');
+                    newAudio.setAttribute('webkit-playsinline', 'true');
                 }
                 
-                // Set source
-                currentAudio.src = audioUrl;
+                // Set source and preload
+                newAudio.src = audioUrl;
+                
+                // Wait for audio to be ready before switching
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Audio load timeout'));
+                    }, 10000);
+                    
+                    const onReady = () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    };
+                    
+                    const onError = (e) => {
+                        clearTimeout(timeout);
+                        reject(e);
+                    };
+                    
+                    newAudio.addEventListener('canplay', onReady, { once: true });
+                    newAudio.addEventListener('error', onError, { once: true });
+                    
+                    newAudio.load();
+                });
+                
+                // Now safely stop previous audio and switch
+                if (previousAudio) {
+                    previousAudio.pause();
+                    if (previousAudio.endedHandler) {
+                        previousAudio.removeEventListener('ended', previousAudio.endedHandler);
+                    }
+                    if (previousAudio.errorHandler) {
+                        previousAudio.removeEventListener('error', previousAudio.errorHandler);
+                    }
+                }
+                
+                currentAudio = newAudio;
                 
                 updateStatus(`Playing verse ${verse.number} - Mishary Alafasy`);
                 updateMediaSessionPlaybackState();
@@ -972,7 +1035,7 @@
                             console.log(`➡️ Moving to handle verse completion`);
                             handleVerseCompletion();
                         }
-                    }, 800); // Increased delay for iOS stability
+                    }, 800);
                 };
 
                 currentAudio.errorHandler = function(event) {
@@ -1026,13 +1089,27 @@
                 console.log(`Verse repeat: ${currentRepeatCount}/${repeatCount}`);
                 
                 if (repeatCount === 'infinite' || currentRepeatCount < repeatCount) {
-                    // Repeat current verse - iOS fix: add delay
+                    // Repeat current verse - reuse existing audio if possible
                     updateStatus(`Repeating verse ${verses[currentVerseIndex].number} (${currentRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`);
-                    setTimeout(() => {
-                        if (isReciting && !isPaused) {
-                            playCurrentVerse();
-                        }
-                    }, 1000); // 1 second delay for iOS
+                    
+                    if (currentAudio && currentAudio.src) {
+                        // iOS fix: Reuse existing audio object for repeats
+                        setTimeout(() => {
+                            if (isReciting && !isPaused) {
+                                currentAudio.currentTime = 0;
+                                currentAudio.play().catch(error => {
+                                    console.error('Repeat play error:', error);
+                                    playCurrentVerse(); // Fallback to new audio
+                                });
+                            }
+                        }, 1000);
+                    } else {
+                        setTimeout(() => {
+                            if (isReciting && !isPaused) {
+                                playCurrentVerse();
+                            }
+                        }, 1000);
+                    }
                     return;
                 } else {
                     // Finished repeating, move to next verse
@@ -1046,9 +1123,15 @@
                     if (isReciting && !isPaused && autoAdvance) {
                         currentVerseIndex++;
                         showVerse(currentVerseIndex, 'right');
-                        playCurrentVerse();
+                        
+                        // iOS fix: Longer delay before loading next audio
+                        setTimeout(() => {
+                            if (isReciting && !isPaused) {
+                                playCurrentVerse();
+                            }
+                        }, 1000); // Additional delay for iOS audio transition
                     }
-                }, 1500); // Increased delay for iOS
+                }, 1500);
             } else {
                 // End of surah - check surah repeat mode
                 if (repeatMode === 'surah') {
@@ -1062,9 +1145,13 @@
                             if (isReciting && !isPaused) {
                                 currentVerseIndex = 0; // Start from Bismillah
                                 showVerse(currentVerseIndex, 'right');
-                                playCurrentVerse();
+                                setTimeout(() => {
+                                    if (isReciting && !isPaused) {
+                                        playCurrentVerse();
+                                    }
+                                }, 1000);
                             }
-                        }, 2000); // 2 second delay for surah repeat
+                        }, 2000);
                         return;
                     }
                 }
@@ -1168,6 +1255,7 @@
             updateStatus('Ready to recite with Mishary Alafasy');
             initializeMediaSession();
             updateMediaSessionMetadata();
+            initializeForIOS(); // Add iOS-specific initialization
         });
     </script>
 </body>
