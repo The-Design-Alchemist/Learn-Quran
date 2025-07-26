@@ -538,56 +538,147 @@
                     ]
                 });
 
+                // Basic playback controls
                 navigator.mediaSession.setActionHandler('play', () => {
+                    console.log('Media Session: Play pressed');
                     startRecitation();
                 });
 
                 navigator.mediaSession.setActionHandler('pause', () => {
+                    console.log('Media Session: Pause pressed');
                     pauseRecitation();
                 });
 
                 navigator.mediaSession.setActionHandler('stop', () => {
+                    console.log('Media Session: Stop pressed');
                     stopRecitation();
                 });
 
+                // Navigation controls
                 navigator.mediaSession.setActionHandler('previoustrack', () => {
-                    previousVerse();
-                    if (isReciting && !isPaused) {
-                        // If reciting, play the new verse
-                        setTimeout(() => {
-                            playCurrentVerse();
-                        }, 500);
-                    }
+                    console.log('Media Session: Previous track pressed');
+                    handlePreviousFromMedia();
                 });
 
                 navigator.mediaSession.setActionHandler('nexttrack', () => {
-                    nextVerse();
-                    if (isReciting && !isPaused) {
-                        // If reciting, play the new verse
-                        setTimeout(() => {
-                            playCurrentVerse();
-                        }, 500);
-                    }
+                    console.log('Media Session: Next track pressed');
+                    handleNextFromMedia();
+                });
+
+                // Seek controls (for fine-grained control)
+                navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                    console.log('Media Session: Seek backward pressed');
+                    handlePreviousFromMedia();
+                });
+
+                navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                    console.log('Media Session: Seek forward pressed');
+                    handleNextFromMedia();
+                });
+
+                // Skip controls (alternative to next/previous)
+                navigator.mediaSession.setActionHandler('skipbackward', () => {
+                    console.log('Media Session: Skip backward pressed');
+                    handlePreviousFromMedia();
+                });
+
+                navigator.mediaSession.setActionHandler('skipforward', () => {
+                    console.log('Media Session: Skip forward pressed');
+                    handleNextFromMedia();
                 });
 
                 // Set initial playback state
                 navigator.mediaSession.playbackState = 'none';
+                
+                console.log('Media Session initialized with all controls');
+            }
+        }
+
+        // Handle previous verse from media controls
+        function handlePreviousFromMedia() {
+            if (currentVerseIndex > 0) {
+                // Stop current audio if playing
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                }
+                
+                // Move to previous verse
+                previousVerse();
+                
+                // If we were reciting, start playing the new verse
+                if (isReciting && !isPaused) {
+                    setTimeout(() => {
+                        playCurrentVerse();
+                    }, 300);
+                }
+                
+                updateStatus(`Previous verse - ${verses[currentVerseIndex].number === 'Bismillah' ? 'Bismillah' : `Verse ${verses[currentVerseIndex].number}`}`);
+            }
+        }
+
+        // Handle next verse from media controls
+        function handleNextFromMedia() {
+            if (currentVerseIndex < verses.length - 1) {
+                // Stop current audio if playing
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                }
+                
+                // Move to next verse
+                nextVerse();
+                
+                // If we were reciting, start playing the new verse
+                if (isReciting && !isPaused) {
+                    setTimeout(() => {
+                        playCurrentVerse();
+                    }, 300);
+                }
+                
+                updateStatus(`Next verse - ${verses[currentVerseIndex].number === 'Bismillah' ? 'Bismillah' : `Verse ${verses[currentVerseIndex].number}`}`);
+            } else {
+                // At the end - handle repeat mode
+                if (repeatMode === 'surah') {
+                    surahRepeatCount++;
+                    if (repeatCount === 'infinite' || surahRepeatCount < repeatCount) {
+                        currentVerseIndex = 0;
+                        showVerse(currentVerseIndex, 'right');
+                        if (isReciting && !isPaused) {
+                            setTimeout(() => {
+                                playCurrentVerse();
+                            }, 300);
+                        }
+                        updateStatus(`Repeating Surah - ${surahRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount}`);
+                    }
+                }
             }
         }
 
         function updateMediaSessionMetadata() {
             if ('mediaSession' in navigator) {
                 const currentVerse = verses[currentVerseIndex];
-                const title = currentVerse.number === 'Bismillah' ? 
+                let title = currentVerse.number === 'Bismillah' ? 
                     'Bismillah' : 
                     `Verse ${currentVerse.number} of 6`;
+                
+                // Add repeat mode info to title
+                if (repeatMode === 'verse' && currentRepeatCount > 0) {
+                    title += ` (🔁 ${currentRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`;
+                } else if (repeatMode === 'surah' && surahRepeatCount > 0) {
+                    title += ` (🔄 ${surahRepeatCount}/${repeatCount === 'infinite' ? '∞' : repeatCount})`;
+                } else if (repeatMode === 'verse') {
+                    title += ' (🔁 Repeat Verse)';
+                } else if (repeatMode === 'surah') {
+                    title += ' (🔄 Repeat Surah)';
+                }
                 
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: title,
                     artist: 'Mishary Rashid Alafasy',
                     album: 'Surah An-Nas - Chapter 114',
                     artwork: [
-                        { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23667eea;stop-opacity:1" /><stop offset="100%" style="stop-color:%23764ba2;stop-opacity:1" /></linearGradient></defs><rect width="512" height="512" fill="url(%23grad1)"/><text x="256" y="150" font-family="Arial, sans-serif" font-size="100" font-weight="bold" text-anchor="middle" fill="white">القرآن</text><text x="256" y="220" font-family="Arial, sans-serif" font-size="36" text-anchor="middle" fill="white" opacity="0.9">Surah An-Nas</text><text x="256" y="280" font-family="Arial, sans-serif" font-size="48" font-weight="bold" text-anchor="middle" fill="white">' + (currentVerse.number === 'Bismillah' ? 'بِسْمِ اللَّهِ' : currentVerse.number) + '</text><text x="256" y="340" font-family="Arial, sans-serif" font-size="28" text-anchor="middle" fill="white" opacity="0.8">' + title + '</text><text x="256" y="400" font-family="Arial, sans-serif" font-size="24" text-anchor="middle" fill="white" opacity="0.7">Mishary Alafasy</text></svg>', sizes: '512x512', type: 'image/svg+xml' }
+                        { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23667eea;stop-opacity:1" /><stop offset="100%" style="stop-color:%23764ba2;stop-opacity:1" /></linearGradient></defs><rect width="512" height="512" fill="url(%23grad1)"/><text x="256" y="120" font-family="Arial, sans-serif" font-size="80" font-weight="bold" text-anchor="middle" fill="white">القرآن</text><text x="256" y="180" font-family="Arial, sans-serif" font-size="32" text-anchor="middle" fill="white" opacity="0.9">Surah An-Nas</text><text x="256" y="240" font-family="Arial, sans-serif" font-size="48" font-weight="bold" text-anchor="middle" fill="white">' + (currentVerse.number === 'Bismillah' ? 'بِسْمِ اللَّهِ' : currentVerse.number) + '</text><text x="256" y="300" font-family="Arial, sans-serif" font-size="24" text-anchor="middle" fill="white" opacity="0.8">' + (currentVerse.number === 'Bismillah' ? 'Bismillah' : `Verse ${currentVerse.number}`) + '</text><text x="256" y="340" font-family="Arial, sans-serif" font-size="20" text-anchor="middle" fill="white" opacity="0.7">Mishary Alafasy</text>' + (repeatMode !== 'none' ? '<text x="256" y="380" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="white" opacity="0.6">' + (repeatMode === 'verse' ? '🔁 Repeat Verse' : '🔄 Repeat Surah') + '</text>' : '') + '</svg>', sizes: '512x512', type: 'image/svg+xml' }
                     ]
                 });
             }
